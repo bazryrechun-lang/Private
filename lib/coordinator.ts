@@ -64,7 +64,12 @@ async function saveMessage(
   role: 'user' | 'assistant',
   content: string
 ) {
-  await supabase.from('messages').insert({ chat_key: chatKey, role, content });
+  const { error } = await supabase
+    .from('messages')
+    .insert({ chat_key: chatKey, role, content });
+  if (error) {
+    console.error('保存聊天记录失败:', error.message);
+  }
 }
 
 export async function handleUserMessage({

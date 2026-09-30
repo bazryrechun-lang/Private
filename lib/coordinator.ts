@@ -15,7 +15,9 @@ const COORDINATOR_SYSTEM_PROMPT = `你是用户的私人协调助理。你的唯
 - trend：抓取热点、调研趋势
 - other：其他
 
-现在执行agent还没有真正接入，你的"分配"目前只是把任务记录下来，不是立刻执行。跟用户说清楚这一点，不要假装任务已经完成。`;
+现在执行agent还没有真正接入，你的"分配"目前只是把任务记录下来，不是立刻执行。跟用户说清楚这一点，不要假装任务已经完成。
+
+你能看到最近的聊天记录，可以根据上下文理解用户在说什么，不用每次都要求用户重复背景信息。`;
 
 const ASSIGN_TASK_TOOL = {
   type: 'function',
@@ -41,16 +43,44 @@ const ASSIGN_TASK_TOOL = {
   },
 };
 
+const HISTORY_LIMIT = 10; // 最多带最近10条历史消息
+
+async function getRecentMessages(chatKey: string) {
+  const { data, error } = await supabase
+    .from('messages')
+    .select('role, content')
+    .eq('chat_key', chatKey)
+    .order('created_at', { ascending: false })
+    .limit(HISTORY_LIMIT);
+
+  if (error || !data) return [];
+
+  // 数据库取出来是"最新在前"，要反转成"最旧在前"给模型看
+  return data.reverse() as { role: 'user' | 'assistant'; content: string }[];
+}
+
+async function saveMessage(
+  chatKey: string,
+  role: 'user' | 'assistant',
+  content: string
+) {
+  await supabase.from('messages').insert({ chat_key: chatKey, role, content });
+}
+
 export async function handleUserMessage({
   message,
   source,
+  chatKey,
 }: {
   message: string;
   source: 'web' | 'telegram';
+  chatKey: string;
 }): Promise<string> {
+  const history = await getRecentMessages(chatKey);
+
   const data = await callClaude({
     system: COORDINATOR_SYSTEM_PROMPT,
-    messages: [{ role: 'user', content: message }],
+    messages: [...history, { role: 'user', content: message }],
     tools: [ASSIGN_TASK_TOOL],
   });
 
@@ -84,5 +114,10 @@ export async function handleUserMessage({
     replyText = '收到，但我没能生成回复，可以再说一次吗？';
   }
 
-  return replyText.trim();
+  replyText = replyText.trim();
+
+  await saveMessage(chatKey, 'user', message);
+  await saveMessage(chatKey, 'assistant', replyText);
+
+  return replyText;
 }

@@ -1,16 +1,31 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 
 type Msg = { role: 'user' | 'assistant'; text: string };
+
+function getClientId() {
+  const key = 'dai-zhuli-client-id';
+  let id = typeof window !== 'undefined' ? localStorage.getItem(key) : null;
+  if (!id) {
+    id = crypto.randomUUID();
+    if (typeof window !== 'undefined') localStorage.setItem(key, id);
+  }
+  return id;
+}
 
 export default function Home() {
   const [messages, setMessages] = useState<Msg[]>([]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
+  const [clientId, setClientId] = useState('');
+
+  useEffect(() => {
+    setClientId(getClientId());
+  }, []);
 
   async function sendMessage() {
-    if (!input.trim() || loading) return;
+    if (!input.trim() || loading || !clientId) return;
 
     const userMsg: Msg = { role: 'user', text: input };
     setMessages((prev) => [...prev, userMsg]);
@@ -21,7 +36,7 @@ export default function Home() {
       const res = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: userMsg.text }),
+        body: JSON.stringify({ message: userMsg.text, clientId }),
       });
       const data = await res.json();
       const replyText = data.reply || data.error || '出错了';

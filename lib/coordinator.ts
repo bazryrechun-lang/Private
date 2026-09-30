@@ -68,7 +68,7 @@ async function saveMessage(
     .from('messages')
     .insert({ chat_key: chatKey, role, content });
   if (error) {
-    console.error('保存聊天记录失败:', error.message);
+    console.error('保存聊天记录失败，完整信息:', JSON.stringify(error));
   }
 }
 

@@ -9,7 +9,7 @@ export async function POST(req: NextRequest) {
     const message = update?.message;
 
     if (!message?.text || !message?.chat?.id) {
-      // 不是文本消息（比如贴图、系统通知），直接忽略
+      // 不是文本消息（比如语音、贴图），直接忽略
       return NextResponse.json({ ok: true });
     }
 
@@ -19,6 +19,7 @@ export async function POST(req: NextRequest) {
     const reply = await handleUserMessage({
       message: userText,
       source: 'telegram',
+      chatKey: `telegram:${chatId}`,
     });
 
     await fetch(`${TELEGRAM_API}/sendMessage`, {
